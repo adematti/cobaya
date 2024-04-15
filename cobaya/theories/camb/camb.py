@@ -804,6 +804,16 @@ class CAMB(BoltzmannBase):
     def set(self, params_values_dict, state):
         # Prepare parameters to be passed: this is called from the CambTransfers instance
         args = {self.translate_param(p): v for p, v in params_values_dict.items()}
+        """
+        args['share_delta_neff'] = False
+        neff_massive_standard = 3.044
+        nmassive = 3
+        args['num_nu_massive'] = np.array(nmassive, dtype=np.int32)
+        args['nu_mass_numbers'] = np.ones(nmassive, dtype=np.int32)
+        args['nu_mass_fractions'] = np.array(args['nu_mass_fractions'])
+        args['num_nu_massless'] = args['nnu'] - neff_massive_standard
+        args['nu_mass_degeneracies'] = np.array([neff_massive_standard / nmassive] * nmassive)
+        """
         # Generate and save
         self.log.debug("Setting parameters: %r and %r", args, self.extra_args)
         try:
@@ -818,6 +828,7 @@ class CAMB(BoltzmannBase):
                         base_args.pop(not_needed, None)
                 self._reduced_extra_args = self.extra_args.copy()
                 params = self.camb.set_params(**base_args)
+                #print('SET1', np.array(params.num_nu_massless), np.array(params.num_nu_massive), np.array(params.nu_mass_eigenstates), np.array(params.nu_mass_numbers), np.array(params.nu_mass_fractions), np.array(params.nu_mass_degeneracies))
                 # pre-set the parameters that are not varying
                 for non_param_func in ['set_classes', 'set_matter_power', 'set_for_lmax']:
                     for fixed_param in getfullargspec(
@@ -866,7 +877,39 @@ class CAMB(BoltzmannBase):
                     params.SourceTerms.limber_windows = self.limber
                 self._base_params = params
             args.update(self._reduced_extra_args)
-            return self.camb.set_params(self._base_params.copy(), **args)
+            #return self.camb.set_params(self._base_params.copy(), **args)
+            params = self.camb.set_params(self._base_params.copy(), **args)
+            cosmomc_theta = args.get('cosmomc_theta', None)
+            thetastar = args.get('thetastar', None)
+            if cosmomc_theta or thetastar:
+                #print('theta', params.N_eff)
+                params.set_H0_for_theta(cosmomc_theta or thetastar, cosmomc_approx=cosmomc_theta is not None,
+                                        theta_H0_range=args.get('theta_H0_range', [10., 100.]), setter_H0=args.get('setter_H0', None))
+            return params
+            """
+            nu_mass_fractions = args.get('nu_mass_fractions')
+            params.share_delta_neff = False
+            params.num_nu_massless = np.array(0.00441)
+            params.num_nu_massive = params.nu_mass_eigenstates = np.array(3)
+            params.nu_mass_numbers = np.ones(params.nu_mass_eigenstates, dtype=np.int32)
+            params.nu_mass_fractions = np.array(nu_mass_fractions)
+            params.nu_mass_degeneracies = np.array([1.01320163] * params.num_nu_massive)
+
+            #nu_mass_fractions = args.get('nu_mass_fractions')
+            #params.share_delta_neff = True
+            #params.num_nu_massless = np.array(0.0044)
+            #params.num_nu_massive = params.nu_mass_eigenstates = np.array(3, dtype=np.int32)
+            #params.nu_mass_numbers = np.ones(params.nu_mass_eigenstates, dtype=np.int32)
+            #params.nu_mass_fractions = np.array(nu_mass_fractions)
+            #args['share_delta_neff'] = True
+            #args['num_nu_massive'] = np.array(3, dtype=np.int32)
+            #args['nu_mass_numbers'] = np.ones(3, dtype=np.int32)
+            #args['nu_mass_fractions'] = np.array(nu_mass_fractions)
+            #args['num_nu_massless'] = np.array(0.0044)
+            #params = self.camb.set_params(params, **args)
+            #print(params)
+            #return params
+            """
         except self.camb.baseconfig.CAMBParamRangeError:
             if self.stop_at_error:
                 raise LoggedError(self.log, "Out of bound parameters: %r",
@@ -997,6 +1040,8 @@ class CambTransfers(HelperTheory):
         for name, mapped in self.cobaya_camb.renames.items():
             if mapped in supported_params:
                 supported_params.add(name)
+        for name in ['num_nu_massless', 'nu_mass_degeneracies', 'nu_mass_fractions']:
+            supported_params.add(name)
         return supported_params
 
     def get_allow_agnostic(self):
@@ -1016,6 +1061,7 @@ class CambTransfers(HelperTheory):
     def calculate(self, state, want_derived=True, **params_values_dict):
         # Set parameters
         camb_params = self.cobaya_camb.set(params_values_dict, state)
+        #print('CALC', np.array(camb_params.num_nu_massless), np.array(camb_params.num_nu_massive), np.array(camb_params.nu_mass_eigenstates), np.array(camb_params.nu_mass_numbers), np.array(camb_params.nu_mass_fractions), np.array(camb_params.nu_mass_degeneracies), np.array(camb_params.omnuh2), np.array(camb_params.H0))
         # Failed to set parameters but no error raised
         # (e.g. out of computationally feasible range): lik=0
         if not camb_params:
