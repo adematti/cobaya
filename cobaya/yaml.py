@@ -83,6 +83,7 @@ def _construct_defaults(loader, node):
                                    "searched for in folder '%s'." % (dfile, folder))
         this_loaded_defaults = yaml_load_file(dfilename)
         loaded_defaults = recursive_update(loaded_defaults, this_loaded_defaults)
+    loader.current_folder = folder
     return loaded_defaults
 
 
@@ -119,6 +120,7 @@ def path_constructor(loader, node):
                 "You can only use the ${YAML_ROOT} placeholder when loading from a file.")
 
     return (env_val or '') + value[match.end():]
+
 
 DefaultsLoader.add_implicit_resolver('!path', path_matcher, None)
 DefaultsLoader.add_constructor('!path', path_constructor)
@@ -217,12 +219,12 @@ def yaml_dump(info: Mapping[str, Any], stream=None, **kwds):
     CustomDumper.add_representer(np.ndarray, _numpy_array_representer)
 
     def _numpy_int_representer(dumper, data):
-        return dumper.represent_int(data)
+        return dumper.represent_int(int(data))
 
     CustomDumper.add_representer(np.int64, _numpy_int_representer)
 
     def _numpy_float_representer(dumper, data):
-        return dumper.represent_float(data)
+        return dumper.represent_float(float(data))
 
     CustomDumper.add_representer(np.float64, _numpy_float_representer)
 

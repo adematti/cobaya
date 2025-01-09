@@ -13,7 +13,7 @@ def run_command():
     prefix = "cobaya-"
     console_scripts = (
         metadata.entry_points().select(group="console_scripts")
-        if sys.version_info > (3, 9)
+        if sys.version_info >= (3, 10)
         else metadata.entry_points()["console_scripts"]
     )
     for script in console_scripts:
@@ -41,3 +41,7 @@ def run_command():
             else:
                 # no command --> assume run with input file as 1st arg (don't pop!)
                 getattr(import_module("cobaya.run"), "run_script")()
+
+
+if __name__ == "__main__":
+    run_command()
